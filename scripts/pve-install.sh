@@ -168,6 +168,9 @@ is_uefi_mode() {
 # Install Proxmox via QEMU/VNC
 install_proxmox() {
     echo -e "${CLR_GREEN}Starting Proxmox VE installation...${CLR_RESET}"
+	# Get the primary and secondary disks
+	PRIMARY_DISK=$(lsblk -dn -o NAME,SIZE,TYPE -e 1,7,11,14,15 | sed -n 1p | awk '{print $1}')
+	SECONDARY_DISK=$(lsblk -dn -o NAME,SIZE,TYPE -e 1,7,11,14,15 | sed -n 2p | awk '{print $1}')
 
     if is_uefi_mode; then
         UEFI_OPTS="-bios /usr/share/ovmf/OVMF.fd"
@@ -184,8 +187,8 @@ install_proxmox() {
         -enable-kvm $UEFI_OPTS \
         -cpu host -smp 4 -m 4096 \
         -boot d -cdrom ./pve-autoinstall.iso \
-        -drive file=/dev/nvme0n1,format=raw,media=disk,if=virtio \
-        -drive file=/dev/nvme1n1,format=raw,media=disk,if=virtio -no-reboot -display none > /dev/null 2>&1
+        -drive file=/dev/$PRIMARY_DISK,format=raw,media=disk,if=virtio \
+        -drive file=/dev/$SECONDARY_DISK,format=raw,media=disk,if=virtio -no-reboot -display none > /dev/null 2>&1
 }
 
 # Function to boot the installed Proxmox via QEMU with port forwarding
@@ -205,8 +208,8 @@ boot_proxmox_with_port_forwarding() {
         -cpu host -device e1000,netdev=net0 \
         -netdev user,id=net0,hostfwd=tcp::5555-:22 \
         -smp 4 -m 4096 \
-        -drive file=/dev/sda,format=raw,media=disk,if=virtio \
-        -drive file=/dev/sdb,format=raw,media=disk,if=virtio -display none \
+        -drive file=/dev/$PRIMARY_DISK,format=raw,media=disk,if=virtio \
+        -drive file=/dev/$SECONDARY_DISK,format=raw,media=disk,if=virtio -display none \
         > qemu_output.log 2>&1 &
     
     QEMU_PID=$!
